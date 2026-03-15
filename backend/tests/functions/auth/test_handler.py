@@ -18,27 +18,27 @@ class MockAuthResponse:
         self.is_new_user = is_new_user
 
 # =========================================================================
-# これから実装する関数をインポート（TDDのRedフェーズのため、最初はModuleNotFoundErrorになる）
+# これから実装する関数群（TDDのRedフェーズのため、最初はModuleNotFoundErrorになる）
 # =========================================================================
-from functions.auth.handler import handler
+from functions.auth.service import AuthService
+from functions.auth.models import AuthRequest, AuthResponse
 
 # =========================================================================
 # 【テストケース（詳細設計）】
-# POST /auth/token
+# AuthService.authenticate(id_token: str) -> AuthResponse
 # 概要：FirebaseのIDトークンを受け取り、検証し、ユーザー情報を返す。
 #      初回ログイン時はユーザープロフィールの登録とマイスペースの自動作成を行う。
 # =========================================================================
 
-class TestAuthTokenAPI:
+class TestAuthService:
 
     @patch("functions.auth.service.db_client.get_item")
     def test_正常系_既存ユーザーがログインしてプロフィールを取得できること(self, mock_get_item, mock_firebase_verify):
         """
         正常系：既存ユーザーのログイン
-        - 有効なIDトークンを送信する
+        - 有効なIDトークンを渡す
         - Firebase検証が成功しUIDが返る
         - DynamoDB(USER#uid PROFILE)から既存データが取得できる
-        - 新規作成処理(create_user)は呼ばれない
         - ユーザー情報と is_new_user=False が返る
         """
         # 1. モックの振る舞い定義（Given）
@@ -47,23 +47,19 @@ class TestAuthTokenAPI:
             "Item": {
                 "PK": {"S": "USER#user123"},
                 "SK": {"S": "PROFILE"},
-                "name": {"S": "Existing User"}
+                "name": {"S": "Existing User"},
+                "picture": {"S": "http://img"}
             }
         }
         
         # 2. テスト対象の実行（When）
-        event = {
-            "httpMethod": "POST",
-            "body": json.dumps({"idToken": "valid_token"})
-        }
-        response = handler(event, {})
+        service = AuthService()
+        response = service.authenticate(id_token="valid_token")
         
         # 3. 期待結果の検証（Then）
-        assert response["statusCode"] == 200
-        body = json.loads(response["body"])
-        assert body["user_id"] == "user123"
-        assert body["name"] == "Existing User"
-        assert body["is_new_user"] is False
+        assert response.user_id == "user123"
+        assert response.name == "Existing User"
+        assert response.is_new_user is False
         
         mock_firebase_verify.assert_called_once_with("valid_token")
         mock_get_item.assert_called_once()
@@ -73,11 +69,10 @@ class TestAuthTokenAPI:
     def test_正常系_新規ユーザーの初回ログイン時にプロフィールとマイスペースが作成されること(self, mock_transact_write, mock_get_item, mock_firebase_verify):
         """
         正常系：新規ユーザーの初回登録
-        - 有効なIDトークンを送信する
+        - 有効なIDトークンを渡す
         - Firebase検証が成功しUIDが返る
-        - DynamoDB(USER#uid PROFILE)からデータが取得できない（Noneが返る）
-        - ユーザー情報(PROFILE)の作成が一度呼ばれる
-        - マイスペース(個人のMy Shops群)の作成処理が一度呼ばれる
+        - DynamoDB(USER#uid PROFILE)からデータが取得できない（未登録）
+        - ユーザー情報(PROFILE)とマイスペースの作成が同時に行われる(transact_write_items)
         - ユーザー情報と is_new_user=True が返る
         """
         # Given
@@ -85,62 +80,31 @@ class TestAuthTokenAPI:
         mock_get_item.return_value = {}  # DynamoDBから取得できない（未登録）
         
         # When
-        event = {
-            "httpMethod": "POST",
-            "body": json.dumps({"idToken": "new_valid_token"})
-        }
-        response = handler(event, {})
+        service = AuthService()
+        response = service.authenticate(id_token="new_valid_token")
 
         # Then
-        assert response["statusCode"] == 200
-        body = json.loads(response["body"])
-        assert body["user_id"] == "new999"
-        assert body["name"] == "New User"
-        assert body["is_new_user"] is True
+        assert response.user_id == "new999"
+        assert response.name == "New User"
+        assert response.is_new_user is True
         
         mock_firebase_verify.assert_called_once_with("new_valid_token")
         mock_get_item.assert_called_once()
         mock_transact_write.assert_called_once()  # 新規作成トランザクションが呼ばれること
 
-    def test_異常系_無効なトークンが送信された場合は401エラーになること(self, mock_firebase_verify):
+    def test_異常系_無効なトークンが渡された場合は認証エラーになること(self, mock_firebase_verify):
         """
         異常系：無効なIDトークン
-        - 無効なトークンや期限切れトークンを送信する
+        - 無効なトークンを渡す
         - Firebase検証でエラー（ValueError等）が発生する
-        - 401 Unauthorized エラーが返る
+        - 例外（ValueError または独自定義の AuthError等）が送出される
         """
         # Given
         mock_firebase_verify.side_effect = ValueError("Invalid token")
         
-        # When
-        event = {
-            "httpMethod": "POST",
-            "body": json.dumps({"idToken": "invalid_or_expired_token"})
-        }
-        response = handler(event, {})
-
-        # Then
-        assert response["statusCode"] == 401
-        body = json.loads(response["body"])
-        assert "error" in body
+        # When & Then
+        service = AuthService()
+        with pytest.raises(ValueError, match="Invalid token"):
+            service.authenticate(id_token="invalid_or_expired_token")
         
         mock_firebase_verify.assert_called_once_with("invalid_or_expired_token")
-
-    def test_異常系_トークンがリクエストに含まれずバリデーションエラーとなること(self):
-        """
-        異常系：リクエストバリデーションエラー
-        - body またはヘッダーに idToken が含まれていないリクエスト
-        - PydanticのValidationError等が発生し、400 Bad Request が返る
-        """
-        # When
-        # bodyが空、あるいは必要なidTokenが存在しない
-        event = {
-            "httpMethod": "POST",
-            "body": json.dumps({})
-        }
-        response = handler(event, {})
-
-        # Then
-        assert response["statusCode"] == 400
-        body = json.loads(response["body"])
-        assert "error" in body
