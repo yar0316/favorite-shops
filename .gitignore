@@ -22,3 +22,10 @@ Thumbs.db
 *.apk
 *.aab
 *.ipa
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/*.pyc
+**/.venv/
+**/.pytest_cache/
