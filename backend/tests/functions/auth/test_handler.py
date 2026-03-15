@@ -28,7 +28,7 @@ class TestAuthTokenAPI:
     @patch("functions.auth.service.verify_firebase_token")
     @patch("functions.auth.service.get_user_profile")
     @patch("functions.auth.service.create_user_profile")
-    def test_auth_success_existing_user(self, mock_create, mock_get_user, mock_verify):
+    def test_正常系_既存ユーザーがログインしてプロフィールを取得できること(self, mock_create, mock_get_user, mock_verify):
         """
         正常系：既存ユーザーのログイン
         - 有効なIDトークンを送信する
@@ -55,7 +55,7 @@ class TestAuthTokenAPI:
     @patch("functions.auth.service.get_user_profile")
     @patch("functions.auth.service.create_user_profile")
     @patch("functions.auth.service.create_myspace_group")
-    def test_auth_success_new_user(self, mock_create_myspace, mock_create_user, mock_get_user, mock_verify):
+    def test_正常系_新規ユーザーの初回ログイン時にプロフィールとマイスペースが作成されること(self, mock_create_myspace, mock_create_user, mock_get_user, mock_verify):
         """
         正常系：新規ユーザーの初回登録
         - 有効なIDトークンを送信する
@@ -78,7 +78,7 @@ class TestAuthTokenAPI:
         pass
 
     @patch("functions.auth.service.verify_firebase_token")
-    def test_auth_invalid_token(self, mock_verify):
+    def test_異常系_無効なトークンが送信された場合は401エラーになること(self, mock_verify):
         """
         異常系：無効なIDトークン
         - 無効なトークンや期限切れトークンを送信する
@@ -92,7 +92,7 @@ class TestAuthTokenAPI:
         # 401エラーレスポンスが返ることを確認
         pass
 
-    def test_auth_missing_token_in_request(self):
+    def test_異常系_トークンがリクエストに含まれずバリデーションエラーとなること(self):
         """
         異常系：リクエストバリデーションエラー
         - body またはヘッダーに idToken が含まれていないリクエスト
