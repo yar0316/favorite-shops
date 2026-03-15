@@ -1,5 +1,6 @@
 import os
 import pytest
+from unittest.mock import patch
 from botocore.stub import Stubber
 
 # 実際のLambda実装（これから作る）やモックするboto3クライアントなどのダミー定義
@@ -9,6 +10,11 @@ from botocore.stub import Stubber
 
 os.environ["DYNAMODB_TABLE"] = "favorite-shops-test"
 os.environ["ENVIRONMENT"] = "test"
+os.environ["AWS_DEFAULT_REGION"] = "ap-northeast-1"
+os.environ["AWS_ACCESS_KEY_ID"] = "testing"
+os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
+os.environ["AWS_SECURITY_TOKEN"] = "testing"
+os.environ["AWS_SESSION_TOKEN"] = "testing"
 
 @pytest.fixture
 def dynamodb_stub():
