@@ -18,3 +18,12 @@ def dynamodb_stub():
     """
     # 抽象化されたフィクスチャ
     pass
+
+@pytest.fixture
+def mock_firebase_verify():
+    """
+    Firebase Admin SDKのトークン検証関数(verify_id_token)をモック化するフィクスチャ。
+    全ドメインの認証テストで共通して利用可能。
+    """
+    with patch("functions.auth.service.firebase_admin.auth.verify_id_token") as mock:
+        yield mock
