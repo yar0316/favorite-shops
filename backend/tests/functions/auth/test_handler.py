@@ -25,10 +25,9 @@ class MockAuthResponse:
 
 class TestAuthTokenAPI:
 
-    @patch("functions.auth.service.verify_firebase_token")
-    @patch("functions.auth.service.get_user_profile")
-    @patch("functions.auth.service.create_user_profile")
-    def test_正常系_既存ユーザーがログインしてプロフィールを取得できること(self, mock_create, mock_get_user, mock_verify):
+    @patch("functions.auth.service.firebase_admin.auth.verify_id_token")
+    @patch("functions.auth.service.db_client.get_item")
+    def test_正常系_既存ユーザーがログインしてプロフィールを取得できること(self, mock_get_item, mock_verify_id_token):
         """
         正常系：既存ユーザーのログイン
         - 有効なIDトークンを送信する
@@ -38,24 +37,28 @@ class TestAuthTokenAPI:
         - ユーザー情報と is_new_user=False が返る
         """
         # 1. モックの振る舞い定義（Given）
-        mock_verify.return_value = {"uid": "user123", "name": "Existing User", "picture": "http://img"}
-        mock_get_user.return_value = {"PK": "USER#user123", "SK": "PROFILE", "name": "Existing User"}
+        mock_verify_id_token.return_value = {"uid": "user123", "name": "Existing User", "picture": "http://img"}
+        mock_get_item.return_value = {
+            "Item": {
+                "PK": {"S": "USER#user123"},
+                "SK": {"S": "PROFILE"},
+                "name": {"S": "Existing User"}
+            }
+        }
         
         # 2. テスト対象の実行（When）
         # response = handler(event={"httpMethod": "POST", "body": '{"idToken": "valid_token"}'}, context={})
         # assert response.status_code == 200 ...
         
         # 3. 期待結果の検証（Then）
-        # mock_verify.assert_called_once_with("valid_token")
-        # mock_get_user.assert_called_once_with("user123")
-        # mock_create.assert_not_called()
+        # mock_verify_id_token.assert_called_once_with("valid_token")
+        # mock_get_item.assert_called_once_with(TableName="...", Key={"PK": {"S": "USER#user123"}, "SK": {"S": "PROFILE"}})
         pass
 
-    @patch("functions.auth.service.verify_firebase_token")
-    @patch("functions.auth.service.get_user_profile")
-    @patch("functions.auth.service.create_user_profile")
-    @patch("functions.auth.service.create_myspace_group")
-    def test_正常系_新規ユーザーの初回ログイン時にプロフィールとマイスペースが作成されること(self, mock_create_myspace, mock_create_user, mock_get_user, mock_verify):
+    @patch("functions.auth.service.firebase_admin.auth.verify_id_token")
+    @patch("functions.auth.service.db_client.get_item")
+    @patch("functions.auth.service.db_client.transact_write_items")
+    def test_正常系_新規ユーザーの初回ログイン時にプロフィールとマイスペースが作成されること(self, mock_transact_write, mock_get_item, mock_verify_id_token):
         """
         正常系：新規ユーザーの初回登録
         - 有効なIDトークンを送信する
@@ -66,19 +69,18 @@ class TestAuthTokenAPI:
         - ユーザー情報と is_new_user=True が返る
         """
         # Given
-        mock_verify.return_value = {"uid": "new999", "name": "New User", "picture": "http://img"}
-        mock_get_user.return_value = None  # 未登録
+        mock_verify_id_token.return_value = {"uid": "new999", "name": "New User", "picture": "http://img"}
+        mock_get_item.return_value = {}  # DynamoDBから取得できない（未登録）
         
         # When
         # 実行...
 
         # Then
-        # mock_create_user.assert_called_once_with("new999", "New User", "http://img")
-        # mock_create_myspace.assert_called_once_with("new999")
+        # mock_transact_write.assert_called_once()  # ユーザー作成とマイスペース作成の同時トランザクションを想定
         pass
 
-    @patch("functions.auth.service.verify_firebase_token")
-    def test_異常系_無効なトークンが送信された場合は401エラーになること(self, mock_verify):
+    @patch("functions.auth.service.firebase_admin.auth.verify_id_token")
+    def test_異常系_無効なトークンが送信された場合は401エラーになること(self, mock_verify_id_token):
         """
         異常系：無効なIDトークン
         - 無効なトークンや期限切れトークンを送信する
@@ -86,7 +88,7 @@ class TestAuthTokenAPI:
         - 401 Unauthorized エラーが返る
         """
         # Given
-        mock_verify.side_effect = ValueError("Invalid token")
+        mock_verify_id_token.side_effect = ValueError("Invalid token")
         
         # When & Then
         # 401エラーレスポンスが返ることを確認
