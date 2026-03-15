@@ -1,6 +1,6 @@
 ---
 name: user-needs
-description: ユーザーの要求（User Needs）を対話形式でヒアリングし、要求定義書を作成します。「要求をまとめたい」「要求定義を作成」「ニーズを整理」「user needs」「gather requirements」などの要望に使用します。
+description: ユーザーの要求（User Needs）を対話形式でヒアリングし、要求定義書を作成するスキルです。「要求をまとめたい」「要求定義を作成して」「ニーズを整理して」「user needs」などの要望があった際に使用してください。
 ---
 
 # User Needs（要求定義）スキル

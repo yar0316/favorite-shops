@@ -1,8 +1,6 @@
 ---
 name: infra-dev
-description: AWSリソース（API Gateway, DynamoDB, S3, IAMなど）をTerraformで構築・変更するスキルです。インフラ設計書の変更や追加リソースが必要になった際に使用します。
-metadata:
-  short-description: Terraformによるインフラ構築 / Infrastructure as Code
+description: AWSリソース（API Gateway, DynamoDB, S3, IAMなど）をTerraformで構築・変更するスキルです。「インフラ設計書を変更して」「追加リソースが必要」「Terraformでインフラを構築して」などの要望があった際に使用してください。
 ---
 
 # インフラ実装（infra-dev）スキル

@@ -1,8 +1,6 @@
 ---
 name: frontend-dev
-description: フロントエンド（Flutter + Riverpod）の機能や画面を実装・修正するスキルです。画面の追加やUIコンポーネントの操作を行う際に使用してください。
-metadata:
-  short-description: フロントエンド機能実装 / Frontend feature development
+description: フロントエンド（Flutter + Riverpod）の機能や画面を実装・修正するスキルです。「画面を追加して」「UIコンポーネントを修正して」「フロントエンド機能を実装して」などのフロントエンド操作を行う際に使用してください。
 ---
 
 # フロントエンド実装（frontend-dev）スキル

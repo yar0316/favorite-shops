@@ -5,7 +5,7 @@
 
 ## 前提条件
 - [uv](https://github.com/astral-sh/uv) がインストールされていること
-- Python 3.12 以上がインストールされていること
+- Python 3.13 以上がインストールされていること
 
 ## セットアップ手順
 
@@ -16,8 +16,8 @@
 
 2. **仮想環境の作成と依存関係のインストール**
    ```bash
-   # 仮想環境を作成（Python 3.12指定）
-   uv venv --python 3.12
+   # 仮想環境を作成（Python 3.13指定）
+   uv venv --python 3.13
    
    # アクティベート (Windows)
    .venv\Scripts\activate

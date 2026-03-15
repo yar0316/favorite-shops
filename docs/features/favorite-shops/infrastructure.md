@@ -117,7 +117,7 @@ infra/
 
 ### Lambda
 
-- ランタイム: Python 3.12
+- ランタイム: Python 3.13
 - ハンドラ: Mangum 経由で FastAPI を起動
 - 環境変数: `ENVIRONMENT`, `DYNAMODB_TABLE`, `S3_BUCKET`, `FIREBASE_PROJECT_ID`
 - 命名規則: `{project}-{environment}-api`（例: `favorite-shops-prod-api`）

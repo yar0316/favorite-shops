@@ -1,8 +1,6 @@
 ---
 name: backend-test
-description: バックエンド機能実装の「前」に、詳細設計書として振る舞いを定義するSmallテストを作成するスキルです。実装の前に仕様を決定したい場合に使用してください。
-metadata:
-  short-description: バックエンドのテスト仕様作成 / Create backend test specifications
+description: バックエンド機能実装の「前」に、詳細設計書として振る舞いを定義するSmallテストを作成するスキルです。「実装の前に仕様を決定したい」「テスト仕様を作成して」などの要望があった場合に使用してください。
 ---
 
 # バックエンドテスト定義（backend-test）スキル

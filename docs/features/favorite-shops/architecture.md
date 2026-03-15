@@ -71,7 +71,7 @@ graph TB
 
 | 要素 | 技術 | 選定理由 |
 |------|------|----------|
-| 言語 | Python 3.12+ | エコシステムが豊富。型ヒント + mypy で堅く書ける |
+| 言語 | Python 3.13+ | エコシステムが豊富。型ヒント + mypy で堅く書ける |
 | 型チェック | mypy (strict) | 静的型チェックで品質保証 |
 | バリデーション | Pydantic v2 | リクエスト/レスポンスの型定義 + バリデーション |
 | Linter/Formatter | Ruff | 高速なLinter + Formatter |

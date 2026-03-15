@@ -1,8 +1,6 @@
 ---
 name: requirements
-description: システムの「要件（Requirements）」を対話形式で定義し、要件定義書を作成します。「要件を定義したい」「要件定義書」「システム要件」「system requirements」「define requirements」などの要望に使用します。
-metadata:
-  short-description: 要件定義書の作成 / Define system requirements
+description: システムの「要件（Requirements）」を対話形式で定義し、要件定義書を作成します。「システム要件を定義したい」「要件定義書を作成して」「system requirements」などの要望があった際に使用してください。
 ---
 
 # Requirements（要件定義）スキル

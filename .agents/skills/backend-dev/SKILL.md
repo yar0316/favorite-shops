@@ -1,8 +1,6 @@
 ---
 name: backend-dev
-description: バックエンド（AWS Lambda + API Gateway + DynamoDB）の機能実装を行うスキルです。バックエンドのAPI追加・変更を行う際に使用してください。
-metadata:
-  short-description: バックエンド機能拡張 / Backend feature development
+description: バックエンド（AWS Lambda + API Gateway + DynamoDB）の機能実装を行うスキルです。「APIを追加して」「バックエンド機能を拡張して」など、バックエンドのAPI追加・変更を行う際に使用してください。
 ---
 
 # バックエンド実装（backend-dev）スキル
@@ -48,7 +46,7 @@ AWS Lambda + DynamoDB のバックエンド機能を実装・修正する際の�
 4. **Lambda Layer の活用**
    - 共通処理（DB初期化、認証検証、共通ユーティリティ）は `layers/shared/` に配置・参照してください。
 5. **型の強制**
-   - Python 3.12+ の型ヒントを完備し、mypy (strict) をパスするコードを書いてください。
+   - Python 3.13+ の型ヒントを完備し、mypy (strict) をパスするコードを書いてください。
 
 ### 4. DynamoDB (Single Table Design) のアクセスパターン実装
 
