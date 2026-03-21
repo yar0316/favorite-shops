@@ -1,8 +1,9 @@
-import os
-from layers.shared.db import db_client
+from layers.shared.db import db_client, TABLE_NAME
 from .models import UserProfileResponse, UserProfileUpdate
 
-TABLE_NAME = os.environ.get("DYNAMODB_TABLE", "favorite-shops-test")
+# ドメイン固有のDynamoDBキープレフィックス
+_USER_PK = "USER#"
+_PROFILE_SK = "PROFILE"
 
 class UserService:
     def get_profile(self, user_id: str) -> UserProfileResponse:
@@ -12,8 +13,8 @@ class UserService:
         response = db_client.get_item(
             TableName=TABLE_NAME,
             Key={
-                "PK": {"S": f"USER#{user_id}"},
-                "SK": {"S": "PROFILE"}
+                "PK": {"S": f"{_USER_PK}{user_id}"},
+                "SK": {"S": _PROFILE_SK}
             }
         )
         
@@ -42,8 +43,8 @@ class UserService:
         response = db_client.update_item(
             TableName=TABLE_NAME,
             Key={
-                "PK": {"S": f"USER#{user_id}"},
-                "SK": {"S": "PROFILE"}
+                "PK": {"S": f"{_USER_PK}{user_id}"},
+                "SK": {"S": _PROFILE_SK}
             },
             UpdateExpression=update_expr,
             ExpressionAttributeNames=attr_names,

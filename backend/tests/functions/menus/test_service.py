@@ -5,17 +5,19 @@ from functions.menus.models import MenuCreate
 
 class TestMenuService:
 
+    @patch("functions.menus.service.verify_membership")
     @patch("functions.menus.service.db_client.put_item")
-    def test_正常系_お店にメニューを登録できること(self, mock_put):
-        # Given
+    def test_正常系_お店にメニューを登録できること(self, mock_put, mock_verify):
+        # Given: メンバーである
+        mock_verify.return_value = None
         menu_data = MenuCreate(name="絶品チャーハン", photo_url="http://img/rice")
         
         # When
         service = MenuService()
-        response = service.add_menu(shop_id="shop123", menu=menu_data)
+        response = service.add_menu(user_id="user123", group_id="group123", shop_id="shop123", menu=menu_data)
         
         # Then
-        assert response.name == "チャーハン"
+        assert response.name == "絶品チャーハン"
         assert response.shop_id == "shop123"
         
         # 設計通りのデータ構造（PK/SK）に変換されてDBへ送られているか検証
@@ -55,11 +57,15 @@ class TestMenuService:
         assert response[0].name == "ラーメン"
         mock_query.assert_called_once()
 
+    @patch("functions.menus.service.verify_membership")
     @patch("functions.menus.service.db_client.delete_item")
-    def test_正常系_メニューを削除できること(self, mock_delete):
+    def test_正常系_メニューを削除できること(self, mock_delete, mock_verify):
+        # Given: メンバーである
+        mock_verify.return_value = None
+
         # When
         service = MenuService()
-        service.delete_menu(shop_id="shop123", menu_id="menu1")
+        service.delete_menu(user_id="user123", group_id="group123", shop_id="shop123", menu_id="menu1")
         
         # Then
         mock_delete.assert_called_once_with(
@@ -69,3 +75,24 @@ class TestMenuService:
                 "SK": {"S": "MENU#menu1"}
             }
         )
+
+    @patch("functions.menus.service.verify_membership")
+    @patch("functions.menus.service.db_client.put_item")
+    def test_異常系_非メンバーがメニューを登録しようとした場合はPermissionErrorになること(self, mock_put, mock_verify):
+        """
+        認可チェック：
+        - verify_membership が PermissionError を送出
+        - 非メンバーはメニュー操作ができない
+        """
+        # Given: ユーザーがグループに所属していない
+        mock_verify.side_effect = PermissionError("Not a member of this group")
+
+        menu_data = MenuCreate(name="絶品チャーハン", photo_url="http://img/rice")
+
+        # When & Then
+        service = MenuService()
+        with pytest.raises(PermissionError, match="Not a member of this group"):
+            service.add_menu(user_id="outsider", group_id="group123", shop_id="shop123", menu=menu_data)
+
+        # DB書き込みが行われていないことを検証
+        mock_put.assert_not_called()

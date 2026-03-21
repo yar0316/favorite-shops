@@ -7,7 +7,7 @@ from functions.users.models import UserProfileResponse
 class TestUserHandler:
 
     @patch("functions.users.handler.UserService")
-    @patch("functions.users.handler.get_user_id_from_event")
+    @patch("layers.shared.response.get_user_id_from_event")
     def test_正常系_自分のプロフィールを取得できること(self, mock_get_uid, mock_user_service_class):
         # Given
         mock_get_uid.return_value = "user123"
@@ -33,3 +33,14 @@ class TestUserHandler:
         
         mock_get_uid.assert_called_once_with(event)
         mock_service.get_profile.assert_called_once_with("user123")
+
+    def test_異常系_認証ヘッダーがない場合は401を返すこと(self):
+        # When
+        event = {
+            "httpMethod": "GET",
+            "headers": {}  # No Auth
+        }
+        response = handler(event, {})
+
+        # Then
+        assert response["statusCode"] == 401

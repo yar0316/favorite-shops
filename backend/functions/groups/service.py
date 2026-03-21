@@ -1,11 +1,18 @@
-import os
+import random
+import string
 import uuid
 from datetime import datetime
 from typing import List
-from layers.shared.db import db_client
+from layers.shared.db import db_client, TABLE_NAME
+from layers.shared.membership import verify_membership
 from .models import GroupCreate, GroupResponse, GroupMemberResponse, InvitationResponse
 
-TABLE_NAME = os.environ.get("DYNAMODB_TABLE", "favorite-shops-test")
+# ドメイン固有のDynamoDBキープレフィックス
+_GROUP_PK = "GROUP#"
+_USER_PK = "USER#"
+_MEMBER_SK = "MEMBER#"
+_INVITE_PK = "INVITE#"
+_META_SK = "META"
 
 class GroupService:
     def create_group(self, user_id: str, group: GroupCreate) -> GroupResponse:
@@ -21,8 +28,8 @@ class GroupService:
                     "Put": {
                         "TableName": TABLE_NAME,
                         "Item": {
-                            "PK": {"S": f"GROUP#{group_id}"},
-                            "SK": {"S": "META"},
+                            "PK": {"S": f"{_GROUP_PK}{group_id}"},
+                            "SK": {"S": _META_SK},
                             "groupName": {"S": group.name},
                             "owner": {"S": user_id},
                             "createdAt": {"S": now}
@@ -33,8 +40,8 @@ class GroupService:
                     "Put": {
                         "TableName": TABLE_NAME,
                         "Item": {
-                            "PK": {"S": f"GROUP#{group_id}"},
-                            "SK": {"S": f"MEMBER#{user_id}"},
+                            "PK": {"S": f"{_GROUP_PK}{group_id}"},
+                            "SK": {"S": f"{_MEMBER_SK}{user_id}"},
                             "role": {"S": "OWNER"},
                             "joinedAt": {"S": now}
                         }
@@ -44,8 +51,8 @@ class GroupService:
                     "Put": {
                         "TableName": TABLE_NAME,
                         "Item": {
-                            "PK": {"S": f"USER#{user_id}"},
-                            "SK": {"S": f"GROUP#{group_id}"},
+                            "PK": {"S": f"{_USER_PK}{user_id}"},
+                            "SK": {"S": f"{_GROUP_PK}{group_id}"},
                             "groupName": {"S": group.name},
                             "role": {"S": "OWNER"}
                         }
@@ -69,14 +76,14 @@ class GroupService:
             TableName=TABLE_NAME,
             KeyConditionExpression="PK = :pk AND begins_with(SK, :sk)",
             ExpressionAttributeValues={
-                ":pk": {"S": f"USER#{user_id}"},
-                ":sk": {"S": "GROUP#"}
+                ":pk": {"S": f"{_USER_PK}{user_id}"},
+                ":sk": {"S": _GROUP_PK}
             }
         )
         
         groups = []
         for item in response.get("Items", []):
-            group_id = item["SK"]["S"].replace("GROUP#", "")
+            group_id = item["SK"]["S"].replace(_GROUP_PK, "")
             groups.append(GroupResponse(
                 id=group_id,
                 name=item["groupName"]["S"],
@@ -85,15 +92,16 @@ class GroupService:
             ))
         return groups
 
-    def get_group_members(self, group_id: str) -> List[GroupMemberResponse]:
+    def get_group_members(self, user_id: str, group_id: str) -> List[GroupMemberResponse]:
+        verify_membership(user_id, group_id)
         # ... (略)
         return members
 
-    def create_invitation(self, group_id: str) -> InvitationResponse:
+    def create_invitation(self, user_id: str, group_id: str) -> InvitationResponse:
         """
         有効期限付き招待コードを生成する。
         """
-        import random, string, time
+        verify_membership(user_id, group_id)
         # 8文字のランダムな英数字
         code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
         # 24時間後を有効期限に設定
@@ -102,19 +110,18 @@ class GroupService:
         # グループ情報を取得（後で参加時にグループ名を引き継ぐため）
         meta = db_client.get_item(
             TableName=TABLE_NAME,
-            Key={"PK": {"S": f"GROUP#{group_id}"}, "SK": {"S": "META"}}
+            Key={"PK": {"S": f"{_GROUP_PK}{group_id}"}, "SK": {"S": _META_SK}}
         )
         group_name = meta.get("Item", {}).get("groupName", {"S": "Shared Group"})["S"]
 
         db_client.put_item(
             TableName=TABLE_NAME,
             Item={
-                "PK": {"S": f"INVITE#{code}"},
-                "SK": {"S": "META"},
+                "PK": {"S": f"{_INVITE_PK}{code}"},
+                "SK": {"S": _META_SK},
                 "group_id": {"S": group_id},
                 "groupName": {"S": group_name},
-                "TTL": {"N": str(int(expires_at))}, # TTL属性
-                "ExpiresAt": {"S": datetime.fromtimestamp(expires_at).isoformat()}
+                "expiresAt": {"N": str(int(expires_at))}
             }
         )
         return InvitationResponse(
@@ -130,7 +137,7 @@ class GroupService:
         # コードの存在チェック
         response = db_client.get_item(
             TableName=TABLE_NAME,
-            Key={"PK": {"S": f"INVITE#{code}"}, "SK": {"S": "META"}}
+            Key={"PK": {"S": f"{_INVITE_PK}{code}"}, "SK": {"S": _META_SK}}
         )
         if "Item" not in response:
             raise ValueError("Invalid or expired invitation code")
@@ -146,8 +153,8 @@ class GroupService:
                     "Put": {
                         "TableName": TABLE_NAME,
                         "Item": {
-                            "PK": {"S": f"GROUP#{group_id}"},
-                            "SK": {"S": f"MEMBER#{user_id}"},
+                            "PK": {"S": f"{_GROUP_PK}{group_id}"},
+                            "SK": {"S": f"{_MEMBER_SK}{user_id}"},
                             "role": {"S": "MEMBER"},
                             "joinedAt": {"S": now}
                         }
@@ -157,8 +164,8 @@ class GroupService:
                     "Put": {
                         "TableName": TABLE_NAME,
                         "Item": {
-                            "PK": {"S": f"USER#{user_id}"},
-                            "SK": {"S": f"GROUP#{group_id}"},
+                            "PK": {"S": f"{_USER_PK}{user_id}"},
+                            "SK": {"S": f"{_GROUP_PK}{group_id}"},
                             "groupName": {"S": group_name},
                             "role": {"S": "MEMBER"}
                         }

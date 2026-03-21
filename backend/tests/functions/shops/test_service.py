@@ -6,9 +6,11 @@ from functions.shops.models import ShopCreate
 
 class TestShopService:
 
+    @patch("functions.shops.service.verify_membership")
     @patch("functions.shops.service.db_client.put_item")
-    def test_正常系_お店を登録できること(self, mock_put):
-        # Given
+    def test_正常系_お店を登録できること(self, mock_put, mock_verify):
+        # Given: メンバーシップ確認は通過する
+        mock_verify.return_value = None
         shop_data = ShopCreate(
             name="テスト飯屋",
             area="渋谷",
@@ -36,9 +38,11 @@ class TestShopService:
         assert response.group_id == "group123"
 
 
+    @patch("functions.shops.service.verify_membership")
     @patch("functions.shops.service.db_client.query")
-    def test_正常系_グループ内のお店一覧を取得できること(self, mock_query):
-        # Given
+    def test_正常系_グループ内のお店一覧を取得できること(self, mock_query, mock_verify):
+        # Given: メンバーシップ確認は通過する
+        mock_verify.return_value = None
         mock_query.return_value = {
             "Items": [
                 {
@@ -58,7 +62,7 @@ class TestShopService:
         
         # When
         service = ShopService()
-        response = service.list_shops(group_id="group123")
+        response = service.list_shops(user_id="user123", group_id="group123")
         
         # Then
         assert response.total == 1
@@ -85,3 +89,46 @@ class TestShopService:
         # Then
         assert response["name"] == "Test Shop"
         assert response["latitude"] == 35.6580
+
+    @patch("functions.shops.service.verify_membership")
+    @patch("functions.shops.service.db_client.put_item")
+    def test_異常系_非メンバーがお店を登録しようとした場合はPermissionErrorになること(self, mock_put, mock_verify):
+        """
+        認可チェック：
+        - user_id が group_id のメンバーでない場合
+        - verify_membership が PermissionError を送出
+        """
+        # Given: ユーザーがグループに所属していない
+        mock_verify.side_effect = PermissionError("Not a member of this group")
+        
+        shop_data = ShopCreate(
+            name="テスト飯屋", area="渋谷",
+            cuisine_genres=["和食"], drink_genres=["ビール"]
+        )
+
+        # When & Then
+        service = ShopService()
+        with pytest.raises(PermissionError, match="Not a member of this group"):
+            service.create_shop(user_id="outsider", group_id="group123", shop=shop_data)
+        
+        # DB書き込みが行われていないことを検証
+        mock_put.assert_not_called()
+
+    @patch("functions.shops.service.verify_membership")
+    @patch("functions.shops.service.db_client.query")
+    def test_異常系_非メンバーがお店一覧を取得しようとした場合はPermissionErrorになること(self, mock_query, mock_verify):
+        """
+        認可チェック：
+        - verify_membership が PermissionError を送出
+        - 非メンバーはグループ内のお店情報にアクセスできない
+        """
+        # Given: ユーザーがグループに所属していない
+        mock_verify.side_effect = PermissionError("Not a member of this group")
+
+        # When & Then
+        service = ShopService()
+        with pytest.raises(PermissionError, match="Not a member of this group"):
+            service.list_shops(user_id="outsider", group_id="group123")
+        
+        # クエリが実行されていないことを検証
+        mock_query.assert_not_called()

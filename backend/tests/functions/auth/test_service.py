@@ -3,22 +3,10 @@ import json
 from unittest.mock import patch, MagicMock
 
 # =========================================================================
-# 【仕様定義（インターフェース）】
-# このテストが期待するRequest/Responseモデル（Pydantic等で後ほど実装）
-# =========================================================================
-class MockAuthRequest:
-    def __init__(self, id_token: str):
-        self.id_token = id_token
-
-class MockAuthResponse:
-    def __init__(self, user_id: str, name: str, picture: str, is_new_user: bool):
-        self.user_id = user_id
-        self.name = name
-        self.picture = picture
-        self.is_new_user = is_new_user
-
-# =========================================================================
-# これから実装する関数群（TDDのRedフェーズのため、最初はModuleNotFoundErrorになる）
+# 【テストケース（詳細設計）】
+# AuthService.authenticate(id_token: str) -> AuthResponse
+# 概要：FirebaseのIDトークンを受け取り、検証し、ユーザー情報を返す。
+#      初回ログイン時はユーザープロフィールの登録とマイスペースの自動作成を行う。
 # =========================================================================
 from functions.auth.service import AuthService
 from functions.auth.models import AuthRequest, AuthResponse

@@ -40,8 +40,7 @@ class TestGroupService:
 
     @patch("functions.groups.service.db_client.query")
     def test_正常系_参加しているグループ一覧を取得できること(self, mock_query):
-        # ... (略)
-        pass
+        pytest.skip("未実装 - グループ一覧取得のテスト")
 
     @patch("functions.groups.service.db_client.get_item")
     @patch("functions.groups.service.db_client.put_item")
@@ -54,7 +53,7 @@ class TestGroupService:
         }
         # When: 招待コードを生成
         service = GroupService()
-        response = service.create_invitation(group_id="group123")
+        response = service.create_invitation(user_id="user123", group_id="group123")
         
         # Then: 
         # - 8文字程度のランダム文字列が生成されている
@@ -64,8 +63,7 @@ class TestGroupService:
         mock_put.assert_called_once()
         args = mock_put.call_args[1]["Item"]
         assert args["PK"]["S"] == f"INVITE#{response.code}"
-        assert "TTL" in args # DynamoDB TTL属性
-        assert "ExpiresAt" in args
+        assert "expiresAt" in args  # DynamoDB TTL属性（Terraform定義と整合）
 
     @patch("functions.groups.service.db_client.get_item")
     @patch("functions.groups.service.db_client.transact_write_items")
@@ -99,3 +97,33 @@ class TestGroupService:
         service = GroupService()
         with pytest.raises(ValueError, match="Invalid or expired invitation code"):
             service.join_group(user_id="user456", code="INVALID")
+
+    @patch("functions.groups.service.verify_membership")
+    def test_異常系_非メンバーが招待コードを発行しようとした場合はPermissionErrorになること(self, mock_verify):
+        """
+        認可チェック：
+        - 招待コード発行はグループメンバーのみ可能
+        - verify_membership が PermissionError を送出
+        """
+        # Given: ユーザーがグループに所属していない
+        mock_verify.side_effect = PermissionError("Not a member of this group")
+
+        # When & Then
+        service = GroupService()
+        with pytest.raises(PermissionError, match="Not a member of this group"):
+            service.create_invitation(user_id="outsider", group_id="group123")
+
+    @patch("functions.groups.service.verify_membership")
+    def test_異常系_非メンバーがグループメンバー一覧を取得しようとした場合はPermissionErrorになること(self, mock_verify):
+        """
+        認可チェック：
+        - verify_membership が PermissionError を送出
+        - 非メンバーはグループ内部情報にアクセスできない
+        """
+        # Given: ユーザーがグループに所属していない
+        mock_verify.side_effect = PermissionError("Not a member of this group")
+
+        # When & Then
+        service = GroupService()
+        with pytest.raises(PermissionError, match="Not a member of this group"):
+            service.get_group_members(user_id="outsider", group_id="group123")

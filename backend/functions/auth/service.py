@@ -1,20 +1,15 @@
-import os
 import uuid
-import boto3
-import firebase_admin
-from firebase_admin import auth, credentials
+from firebase_admin import auth
 from .models import AuthResponse
+from layers.shared.auth import verify_token
+from layers.shared.db import db_client, TABLE_NAME
 
-# Firebase Admin SDKの初期化（一度だけ実行）
-try:
-    firebase_admin.get_app()
-except ValueError:
-    # サービスアカウント情報は実行環境の環境変数等で指定される想定
-    # 本番ではデフォルトのクレデンシャルを使用
-    firebase_admin.initialize_app()
-
-from layers.shared.db import db_client
-TABLE_NAME = os.environ.get("DYNAMODB_TABLE", "favorite-shops-test")
+# ドメイン固有のDynamoDBキープレフィックス
+_USER_PK = "USER#"
+_GROUP_PK = "GROUP#"
+_MEMBER_SK = "MEMBER#"
+_PROFILE_SK = "PROFILE"
+_META_SK = "META"
 
 class AuthService:
     def authenticate(self, id_token: str) -> AuthResponse:
@@ -35,8 +30,8 @@ class AuthService:
         response = db_client.get_item(
             TableName=TABLE_NAME,
             Key={
-                "PK": {"S": f"USER#{uid}"},
-                "SK": {"S": "PROFILE"}
+                "PK": {"S": f"{_USER_PK}{uid}"},
+                "SK": {"S": _PROFILE_SK}
             }
         )
 
@@ -57,8 +52,8 @@ class AuthService:
                     "Put": {
                         "TableName": TABLE_NAME,
                         "Item": {
-                            "PK": {"S": f"USER#{uid}"},
-                            "SK": {"S": "PROFILE"},
+                            "PK": {"S": f"{_USER_PK}{uid}"},
+                            "SK": {"S": _PROFILE_SK},
                             "name": {"S": name},
                             "picture": {"S": picture},
                             "email": {"S": decoded_token.get("email", "")}
@@ -69,8 +64,8 @@ class AuthService:
                     "Put": {
                         "TableName": TABLE_NAME,
                         "Item": {
-                            "PK": {"S": f"USER#{uid}"},
-                            "SK": {"S": f"GROUP#{my_space_id}"},
+                            "PK": {"S": f"{_USER_PK}{uid}"},
+                            "SK": {"S": f"{_GROUP_PK}{my_space_id}"},
                             "groupName": {"S": "マイスペース"},
                             "role": {"S": "OWNER"}
                         }
@@ -80,8 +75,8 @@ class AuthService:
                     "Put": {
                         "TableName": TABLE_NAME,
                         "Item": {
-                            "PK": {"S": f"GROUP#{my_space_id}"},
-                            "SK": {"S": "META"},
+                            "PK": {"S": f"{_GROUP_PK}{my_space_id}"},
+                            "SK": {"S": _META_SK},
                             "groupName": {"S": "マイスペース"},
                             "owner": {"S": uid}
                         }
@@ -91,8 +86,8 @@ class AuthService:
                     "Put": {
                         "TableName": TABLE_NAME,
                         "Item": {
-                            "PK": {"S": f"GROUP#{my_space_id}"},
-                            "SK": {"S": f"MEMBER#{uid}"},
+                            "PK": {"S": f"{_GROUP_PK}{my_space_id}"},
+                            "SK": {"S": f"{_MEMBER_SK}{uid}"},
                             "name": {"S": name},
                             "role": {"S": "OWNER"}
                         }
@@ -107,3 +102,4 @@ class AuthService:
             picture=picture,
             is_new_user=True
         )
+

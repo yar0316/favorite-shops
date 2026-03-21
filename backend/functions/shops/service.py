@@ -1,23 +1,27 @@
-import os
 import uuid
 from datetime import datetime
-from typing import List, Optional
-from layers.shared.db import db_client
+from typing import Optional
+from layers.shared.db import db_client, TABLE_NAME
+from layers.shared.membership import verify_membership
 from .models import ShopCreate, ShopResponse, ShopListResponse, ParsedShopResponse
 
-TABLE_NAME = os.environ.get("DYNAMODB_TABLE", "favorite-shops-test")
+# ドメイン固有のDynamoDBキープレフィックス
+_GROUP_PK = "GROUP#"
+_SHOP_SK = "SHOP#"
 
 class ShopService:
     def create_shop(self, user_id: str, group_id: str, shop: ShopCreate) -> ShopResponse:
         """
         グループにお店を登録する。
         """
+        verify_membership(user_id, group_id)
+        
         shop_id = str(uuid.uuid4())
         now = datetime.now().isoformat()
         
         item = {
-            "PK": {"S": f"GROUP#{group_id}"},
-            "SK": {"S": f"SHOP#{shop_id}"},
+            "PK": {"S": f"{_GROUP_PK}{group_id}"},
+            "SK": {"S": f"{_SHOP_SK}{shop_id}"},
             "name": {"S": shop.name},
             "area": {"S": shop.area},
             "cuisine_genres": {"SS": shop.cuisine_genres},
@@ -48,17 +52,19 @@ class ShopService:
             **shop.model_dump()
         )
 
-    def list_shops(self, group_id: str, cuisine_genre: Optional[str] = None) -> ShopListResponse:
+    def list_shops(self, user_id: str, group_id: str, cuisine_genre: Optional[str] = None) -> ShopListResponse:
         """
         グループ内のお店一覧を取得する。
         """
+        verify_membership(user_id, group_id)
+        
         # クエリのベース
         params = {
             "TableName": TABLE_NAME,
             "KeyConditionExpression": "PK = :pk AND begins_with(SK, :sk)",
             "ExpressionAttributeValues": {
-                ":pk": {"S": f"GROUP#{group_id}"},
-                ":sk": {"S": "SHOP#"}
+                ":pk": {"S": f"{_GROUP_PK}{group_id}"},
+                ":sk": {"S": _SHOP_SK}
             }
         }
 
@@ -82,8 +88,8 @@ class ShopService:
         response = db_client.get_item(
             TableName=TABLE_NAME,
             Key={
-                "PK": {"S": f"GROUP#{group_id}"},
-                "SK": {"S": f"SHOP#{shop_id}"}
+                "PK": {"S": f"{_GROUP_PK}{group_id}"},
+                "SK": {"S": f"{_SHOP_SK}{shop_id}"}
             }
         )
         
@@ -100,8 +106,8 @@ class ShopService:
         pass
 
     def _item_to_shop_response(self, item: dict) -> ShopResponse:
-        shop_id = item["SK"]["S"].replace("SHOP#", "")
-        group_id = item["PK"]["S"].replace("GROUP#", "")
+        shop_id = item["SK"]["S"].replace(_SHOP_SK, "")
+        group_id = item["PK"]["S"].replace(_GROUP_PK, "")
         
         return ShopResponse(
             id=shop_id,

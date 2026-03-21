@@ -86,4 +86,14 @@ DynamoDB では JOIN ができないため、表示に必要な情報を各ア�
 
 ### 属性の詳細について
 
-各エンティティの属性詳細は**コード（Pydantic モデル）を Single Source of Truth** とする。FastAPI の OpenAPI ドキュメント（Swagger UI）で最新の属性定義を確認可能。
+各エンティティの属性詳細は**コード（Pydantic モデル）を Single Source of Truth** とする。
+属性定義ファイルは各ドメインの `functions/{domain}/models.py` に配置されている。
+
+| ドメイン | モデルファイル |
+|----------|---------------|
+| 認証 | `functions/auth/models.py` |
+| ユーザー | `functions/users/models.py` |
+| グループ | `functions/groups/models.py` |
+| お店 | `functions/shops/models.py` |
+| メニュー | `functions/menus/models.py` |
+| アップロード | `functions/upload/models.py` |
