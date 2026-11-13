@@ -1,0 +1,83 @@
+services:
+  emulator:
+    build: ./local-emulator
+    mem_limit: 2g
+    environment:
+      EMULATOR_TELEMETRY: "off"
+    volumes:
+      - emulator-data:/home/emulator/.aws/emulator
+    ports:
+      - "127.0.0.1:9297:9297"
+  init:
+    build: .
+    entrypoint: ["python", "/local/init_table.py"]
+    network_mode: service:emulator
+    depends_on:
+      emulator:
+        condition: service_started
+    volumes:
+      - emulator-data:/emulator:ro
+      - ./local-emulator:/local:ro
+    environment: &emulator-env
+      AWS_ENDPOINT_URL: https://127.0.0.1:9297
+      AWS_SHARED_CREDENTIALS_FILE: /emulator/9297/emulator_credentials
+      AWS_CONFIG_FILE: /emulator/9297/config
+      AWS_CA_BUNDLE: /emulator/9297/ca.pem
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_DISABLE_HOST_PREFIX_INJECTION: "true"
+      AWS_DEFAULT_REGION: ap-northeast-1
+      DYNAMODB_TABLE: favorite-shops-local
+      S3_BUCKET: favorite-shops-local-images
+  auth: &lambda
+    build: .
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    volumes:
+      - ./layers:/var/task/layers:ro
+      - ./functions:/var/task/functions:ro
+      - ./tests/mocks/auth_mock.py:/var/task/layers/shared/auth.py:ro
+      - emulator-data:/emulator:ro
+    environment: *emulator-env
+    command: functions.auth.handler.handler
+    ports:
+      - "127.0.0.1:8081:8080"
+  users:
+    <<: *lambda
+    command: functions.users.handler.handler
+    ports: ["127.0.0.1:8082:8080"]
+  shops:
+    <<: *lambda
+    command: functions.shops.handler.handler
+    ports: ["127.0.0.1:8083:8080"]
+  groups:
+    <<: *lambda
+    command: functions.groups.handler.handler
+    ports: ["127.0.0.1:8084:8080"]
+  menus:
+    <<: *lambda
+    command: functions.menus.handler.handler
+    ports: ["127.0.0.1:8085:8080"]
+  auth-proxy: &proxy
+    image: alpine/socat:1.8.0.3
+    network_mode: service:auth
+    depends_on: [auth, emulator]
+    command: ["TCP-LISTEN:9297,bind=127.0.0.1,fork,reuseaddr", "TCP:emulator:9297"]
+  users-proxy:
+    <<: *proxy
+    network_mode: service:users
+    depends_on: [users, emulator]
+  shops-proxy:
+    <<: *proxy
+    network_mode: service:shops
+    depends_on: [shops, emulator]
+  groups-proxy:
+    <<: *proxy
+    network_mode: service:groups
+    depends_on: [groups, emulator]
+  menus-proxy:
+    <<: *proxy
+    network_mode: service:menus
+    depends_on: [menus, emulator]
+volumes:
+  emulator-data:
